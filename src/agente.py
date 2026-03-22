@@ -11,7 +11,12 @@ def normalizar(texto):
 
 # ===== CARREGAR DADOS =====
 def carregar_dados():
-    df = pd.read_csv("../data/transacoes.csv")
+    import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+caminho = os.path.join(BASE_DIR, "..", "data", "transacoes.csv")
+
+df = pd.read_csv(caminho)
     df.columns = df.columns.str.lower()
 
     # pegar só despesas

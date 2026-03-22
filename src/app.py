@@ -1,61 +1,94 @@
 import streamlit as st
 import pandas as pd
+import os
 from agente import responder
 
-st.set_page_config(page_title="FinBot", layout="wide")
+# ===== CONFIGURAÇÃO DA PÁGINA =====
+st.set_page_config(
+    page_title="FinBot",
+    page_icon="💰",
+    layout="wide"
+)
 
-st.title("💰 FinBot - Assistente Financeiro Inteligente")
+st.title("💰 FinBot - Assistente Financeiro")
 
-# ===== CARREGAR DADOS =====
-df = pd.read_csv("../data/transacoes.csv")
+# ===== CARREGAR DADOS (CORRIGIDO PARA STREAMLIT CLOUD) =====
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+caminho = os.path.join(BASE_DIR, "..", "data", "transacoes.csv")
+
+try:
+    df = pd.read_csv(caminho)
+except Exception as e:
+    st.error("Erro ao carregar os dados. Verifique o caminho do arquivo.")
+    st.stop()
+
+# ===== TRATAMENTO DOS DADOS =====
 df.columns = df.columns.str.lower()
+df["valor"] = df["valor"].astype(float)
 
-despesas = df[df["tipo"].str.lower() == "saida"].copy()
+# separar despesas
+despesas = df[df["tipo"].str.lower() == "saida"]
 
-# ===== MÉTRICAS =====
+# ===== DASHBOARD =====
+st.subheader("📊 Resumo Financeiro")
+
 total = despesas["valor"].sum()
-maior_categoria = despesas.groupby("categoria")["valor"].sum().idxmax()
-maior_valor = despesas.groupby("categoria")["valor"].sum().max()
 
-col1, col2, col3 = st.columns(3)
+if not despesas.empty:
+    grafico = despesas.groupby("categoria")["valor"].sum()
 
-col1.metric("💸 Total gasto", f"R${total:.2f}")
-col2.metric("📊 Maior categoria", maior_categoria)
-col3.metric("🔥 Maior valor", f"R${maior_valor:.2f}")
+    col1, col2 = st.columns(2)
 
-# ===== GRÁFICO =====
-st.subheader("📊 Distribuição de gastos")
+    with col1:
+        st.bar_chart(grafico)
 
-grafico = despesas.groupby("categoria")["valor"].sum()
+    with col2:
+        st.write("Distribuição de gastos por categoria:")
+        st.pyplot(grafico.plot.pie(autopct='%1.1f%%').figure)
 
-st.bar_chart(grafico)
+    maior_categoria = grafico.idxmax()
+    maior_valor = grafico.max()
+    percentual = (maior_valor / total) * 100
 
-# pizza (mais bonito)
-st.subheader("🥧 Proporção dos gastos")
-st.pyplot(grafico.plot.pie(autopct='%1.1f%%').figure)
+    st.info(
+        f"⚠️ Você está gastando {percentual:.1f}% do seu orçamento em {maior_categoria}. "
+        f"O ideal é manter abaixo de 30%."
+    )
+else:
+    st.warning("Nenhuma despesa encontrada.")
 
 # ===== CHAT =====
-st.divider()
 st.subheader("💬 Converse com o FinBot")
 
 if "mensagens" not in st.session_state:
     st.session_state.mensagens = []
 
+# mostrar histórico
 for msg in st.session_state.mensagens:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-pergunta = st.chat_input("Digite sua pergunta...")
+# input
+pergunta = st.chat_input("Ex: Como economizar em moradia?")
 
 if pergunta:
+    # mostrar pergunta
     with st.chat_message("user"):
         st.write(pergunta)
 
-    st.session_state.mensagens.append({"role": "user", "content": pergunta})
+    st.session_state.mensagens.append({
+        "role": "user",
+        "content": pergunta
+    })
 
+    # gerar resposta
     resposta = responder(pergunta)
 
+    # mostrar resposta
     with st.chat_message("assistant"):
         st.write(resposta)
 
-    st.session_state.mensagens.append({"role": "assistant", "content": resposta})
+    st.session_state.mensagens.append({
+        "role": "assistant",
+        "content": resposta
+    })
